@@ -1,0 +1,50 @@
+name: d9
+recipe: drupal9
+config:
+  webroot: web
+  php: '7.4'
+  drush: '*'
+  xdebug: true
+  composer_version: '2.0.7'
+  conf:
+    php: .vscode/php.ini
+services:
+  database:
+    portforward: 32779
+  appserver:
+    type: php:7.4
+    cmd: drush --root=/app/web
+    build:
+      - "composer global require drupal/coder"
+      - "phpcs --config-set installed_paths /app/vendor/drupal/coder/coder_sniffer"
+    overrides:
+      environment:
+        SIMPLETEST_BASE_URL: "http://d9.lndo.site"
+        SIMPLETEST_DB: "mysql://root:@database:3306/drupal9"
+        MINK_DRIVER_ARGS_WEBDRIVER: '["chrome", {"browserName":"chrome","chromeOptions":{"args":["--disable-gpu","--headless"]}}, "http://chrome:9515"]'
+  chrome:
+    type: compose
+    services:
+      image: drupalci/webdriver-chromedriver:production
+      command: chromedriver --log-path=/tmp/chromedriver.log --verbose --whitelisted-ips=
+
+tooling:
+  drupalcs:
+    service: appserver
+    cmd: "/app/vendor/bin/phpcs --standard=Drupal,DrupalPractice"
+    description: Run phpcs Drupal Coding Standards against a given file or directory.
+  drupalcbf:
+    service: appserver
+    cmd: "/app/vendor/bin/phpcbf --standard=Drupal,DrupalPractice"
+    description: Automatically fix Drupal coding standards suggestions.
+  drupal-check:
+    service: appserver
+    cmd: /app/vendor/bin/drupal-check -ad
+    description: Check Drupal code for deprecations and discover bugs via static analysi
+  test:
+    service: appserver
+    cmd: "php /app/vendor/bin/phpunit -c /app/phpunit.xml"
+    description: Run PHPUnit tests on a specific file or Drupal module.
+events:
+  pre-start:
+    - appserver: composer install
