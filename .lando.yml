@@ -9,8 +9,6 @@ config:
   conf:
     php: .vscode/php.ini
 services:
-  database:
-    portforward: 32779
   appserver:
     type: php:7.4
     cmd: drush --root=/app/web
@@ -27,6 +25,22 @@ services:
     services:
       image: drupalci/webdriver-chromedriver:production
       command: chromedriver --log-path=/tmp/chromedriver.log --verbose --whitelisted-ips=
+  sonarqube:
+    type: php:7.4
+    build_as_root:
+      - "apt-get update && apt-get install default-jdk -y"
+    build:
+      - "cd ~ && wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-8.9.6.50800.zip"
+      - "cd ~ && wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.6.2.2472-linux.zip"
+      - "unzip ~/sonarqube-8.9.6.50800.zip -d ~"
+      - "unzip ~/sonar-scanner-cli-4.6.2.2472-linux.zip -d ~"
+      - "rm ~/sonarqube-8.9.6.50800.zip"
+      - "rm ~/sonar-scanner-cli-4.6.2.2472-linux.zip"
+    moreHttpPorts:
+      - '9000'
+    overrides:
+      ports:
+       - '9000'
 
 tooling:
   drupalcs:
@@ -45,6 +59,18 @@ tooling:
     service: appserver
     cmd: "php /app/vendor/bin/phpunit -c /app/phpunit.xml"
     description: Run PHPUnit tests on a specific file or Drupal module.
+  sonarstart:
+    service: sonarqube
+    cmd: "~/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh start"
+    description: Start SonarQube service
+  sonarstop:
+    service: sonarqube
+    cmd: "~/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh stop"
+    description: Stop SonarQube service
+  sonarscan:
+    service: sonarqube
+    cmd: "~/sonar-scanner-4.6.2.2472-linux/bin/sonar-scanner -Dproject.settings=/app/sonar-project.properties"
+    description: Run SonarQube scan
 events:
   pre-start:
     - appserver: composer install
